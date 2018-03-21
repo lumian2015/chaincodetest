@@ -141,8 +141,21 @@ func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 		if len(args) < 1 {
 			return nil, errors.New("get operation must include one argument, a key")
 		}
+		value, err := stub.GetState(args[0] + "token")
+		if err != nil {
+			fmt.Printf("Failed to get the patient's token")
+			return nil, errors.New("failed to get the patient's token")
+		}
+		token := Token{}
+		if value != nil {
+			err = json.Unmarshal([]byte(value), &token)
+			if token.Owner != args[0] && token.Availability == false {
+				fmt.Printf("Someone is writing the data, try later")
+				return nil, errors.New("Someone is writing the data, try later")
+			}
+		}
 		key := args[0]
-		value, err := stub.GetState(key)
+		value, err = stub.GetState(key)
 		if err != nil {
 			return nil, fmt.Errorf("get operation failed. Error accessing state: %s", err)
 		}
