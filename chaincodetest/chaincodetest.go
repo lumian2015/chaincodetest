@@ -51,6 +51,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 				fmt.Printf("You must get the token before you write!")
 				return nil, errors.New("You must get the token before you write!")
 			}
+		} else {
+			return nil, errors.New("You must get the token before you write!")
 		}
 		patient_id := args[0]
 		record := Record{}
