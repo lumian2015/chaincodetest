@@ -20,7 +20,7 @@ type Record struct {
 }
 
 type Token struct {
-	Owner        []byte
+	Owner        string //will change to certificate later
 	Availability bool
 }
 
@@ -78,8 +78,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		}
 		return nil, nil
 	case "getToken":
-		if len(args) != 1 {
-			return nil, errors.New("getToken operation must provide the key")
+		if len(args) != 2 {
+			return nil, errors.New("getToken operation must provide the key and the hospital's name")
 		}
 		patient_id := args[0] + "token"
 		value, err := stub.GetState(patient_id)
@@ -94,16 +94,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 				return nil, errors.New("Someone else owns the token right now")
 			}
 		}
-		callerCert, err := stub.GetCallerMetadata()
-		if err != nil {
-			fmt.Printf("Failed getting metadata of caller %s", err)
-			return nil, errors.New("Failed getting metadata.")
-		}
-		if len(callerCert) == 0 {
-			fmt.Printf("Invalid caller certificate. Empty.")
-			return nil, errors.New("Invalid admin certificate. Empty.")
-		}
-		token.Owner = callerCert
+		token.Owner = args[1]
 		token.Availability = false
 		b, err := json.Marshal(token)
 		if err != nil {
