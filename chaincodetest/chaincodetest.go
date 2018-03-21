@@ -19,6 +19,11 @@ type Record struct {
 	Checkpoint bool
 }
 
+type Token struct {
+	Owner        []byte
+	Availability bool
+}
+
 func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	return nil, nil
 }
@@ -63,6 +68,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		b, err := json.Marshal(res)
 		if err != nil {
 			fmt.Println("encoding failed")
+			return nil, fmt.Errorf("Encoding failed %s", err)
 		} else {
 			err = stub.PutState(patient_id, []byte(b))
 			if err != nil {
@@ -71,7 +77,46 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 			}
 		}
 		return nil, nil
-
+	case "getToken":
+		if len(args) != 1 {
+			return nil, errors.New("getToken operation must provide the key")
+		}
+		patient_id := args[0] + "token"
+		value, err := stub.GetState(patient_id)
+		if err != nil {
+			return nil, errors.New("Failed to get the patient's token")
+		}
+		token := Token{}
+		if value != nil {
+			err = json.Unmarshal([]byte(value), &token)
+			if token.Availability == false {
+				fmt.Printf("Someone else owns the token right now")
+				return nil, errors.New("Someone else owns the token right now")
+			}
+		}
+		callerCert, err := stub.GetCallerMetadata()
+		if err != nil {
+			fmt.Printf("Failed getting metadata of caller %s", err)
+			return nil, errors.New("Failed getting metadata.")
+		}
+		if len(callerCert) == 0 {
+			fmt.Printf("Invalid caller certificate. Empty.")
+			return nil, errors.New("Invalid admin certificate. Empty.")
+		}
+		token.Owner = callerCert
+		token.Availability = false
+		b, err := json.Marshal(token)
+		if err != nil {
+			fmt.Println("encoding failed")
+			return nil, fmt.Errorf("Encoding failed %s", err)
+		} else {
+			err = stub.PutState(patient_id, []byte(b))
+			if err != nil {
+				fmt.Printf("Error getting token %s", err)
+				return nil, fmt.Errorf("getToken operation failed. Error updating state: %s", err)
+			}
+		}
+		return nil, nil
 	default:
 		return nil, errors.New("Unsupported operation")
 	}
