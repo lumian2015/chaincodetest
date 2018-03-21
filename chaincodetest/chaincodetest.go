@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
@@ -13,10 +14,11 @@ type SimpleChaincode struct {
 }
 
 type Record struct {
+	Hospital   string
 	Disease    string
-	Timestamp  int
 	Link       string
 	Checkpoint bool
+	Timestamp  time.Time
 }
 
 type Token struct {
@@ -37,20 +39,30 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		if len(args) < 5 {
 			return nil, errors.New("put operation must include five arguments, a key and four values")
 		}
+		value, err := stub.GetState(args[0] + "token")
+		if err != nil {
+			fmt.Printf("Failed to get the patient's token")
+			return nil, errors.New("failed to get the patient's token")
+		}
+		token := Token{}
+		if value != nil {
+			err = json.Unmarshal([]byte(value), &token)
+			if token.Owner != args[1] {
+				fmt.Printf("You must get the token before you write!")
+				return nil, errors.New("You must get the token before you write!")
+			}
+		}
 		patient_id := args[0]
 		record := Record{}
-		record.Disease = args[1]
-		timestamp, err := strconv.Atoi(args[2])
-		if err != nil {
-			return nil, errors.New("Failed to change timestamp from string to int")
-		}
-		record.Timestamp = timestamp
+		record.Hospital = args[1]
+		record.Disease = args[2]
 		record.Link = args[3]
 		record.Checkpoint, err = strconv.ParseBool(args[4])
 		if err != nil {
 			return nil, errors.New("Failed to change checkpoint from string to bool")
 		}
-		value, err := stub.GetState(patient_id)
+		record.Timestamp = time.Now()
+		value, err = stub.GetState(patient_id)
 		if err != nil {
 			return nil, errors.New("Failed to get the patient's records")
 		}
@@ -76,6 +88,9 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 				return nil, fmt.Errorf("put operation failed. Error updating state: %s", err)
 			}
 		}
+		token.Availability = true
+		t, err := json.Marshal(token)
+		stub.PutState(patient_id+"token", []byte(t))
 		return nil, nil
 	case "getToken":
 		if len(args) != 2 {
