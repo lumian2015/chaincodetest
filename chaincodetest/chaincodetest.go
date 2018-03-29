@@ -41,18 +41,16 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		}
 		value, err := stub.GetState(args[0] + "token")
 		if err != nil {
-			fmt.Printf("Failed to get the patient's token")
-			return nil, errors.New("failed to get the patient's token")
+			return nil, errors.New("Put failed")
 		}
 		token := Token{}
 		if value != nil {
 			err = json.Unmarshal([]byte(value), &token)
 			if token.Owner != args[1] {
-				fmt.Printf("You must get the token before you write!")
-				return nil, errors.New("You must get the token before you write!")
+				return nil, errors.New("Put failed")
 			}
 		} else {
-			return nil, errors.New("You must get the token before you write!")
+			return nil, errors.New("Put failed")
 		}
 		patient_id := args[0]
 		record := Record{}
@@ -93,6 +91,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		token.Availability = true
 		t, err := json.Marshal(token)
 		stub.PutState(patient_id+"token", []byte(t))
+		successed_msg := "Put success"
+		stub.SetEvent("successedEvent", []byte(successed_msg))
 		return nil, nil
 	case "getToken":
 		if len(args) != 2 {
@@ -101,29 +101,28 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		patient_id := args[0] + "token"
 		value, err := stub.GetState(patient_id)
 		if err != nil {
-			return nil, errors.New("Failed to get the patient's token")
+			return nil, errors.New("Get token failed")
 		}
 		token := Token{}
 		if value != nil {
-			err = json.Unmarshal([]byte(value), &token)
-			if token.Availability == false {
-				fmt.Printf("Someone else owns the token right now")
-				return nil, errors.New("Someone else owns the token right now")
+			json.Unmarshal([]byte(value), &token)
+			if token.Availability == false && token.Owner != args[1] {
+				return nil, errors.New("Get token failed")
 			}
 		}
 		token.Owner = args[1]
 		token.Availability = false
 		b, err := json.Marshal(token)
 		if err != nil {
-			fmt.Println("encoding failed")
 			return nil, fmt.Errorf("Encoding failed %s", err)
 		} else {
 			err = stub.PutState(patient_id, []byte(b))
 			if err != nil {
-				fmt.Printf("Error getting token %s", err)
 				return nil, fmt.Errorf("getToken operation failed. Error updating state: %s", err)
 			}
 		}
+		successed_msg := args[1]
+		stub.SetEvent(args[0], []byte(successed_msg))
 		return nil, nil
 	default:
 		return nil, errors.New("Unsupported operation")
@@ -132,7 +131,6 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 
 // Query has two functions
 // get - takes one argument, a key, and returns the value for the key
-// keys - returns all keys stored in this chaincode
 func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 
 	switch function {
@@ -164,30 +162,6 @@ func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 		}
 		fmt.Printf("the result is %s\n", string(value))
 		return value, nil
-
-	case "keys":
-
-		keysIter, err := stub.RangeQueryState("", "")
-		if err != nil {
-			return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)
-		}
-		defer keysIter.Close()
-
-		var keys []string
-		for keysIter.HasNext() {
-			key, _, iterErr := keysIter.Next()
-			if iterErr != nil {
-				return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)
-			}
-			keys = append(keys, key)
-		}
-
-		jsonKeys, err := json.Marshal(keys)
-		if err != nil {
-			return nil, fmt.Errorf("keys operation failed. Error marshaling JSON: %s", err)
-		}
-
-		return jsonKeys, nil
 
 	default:
 		return nil, errors.New("Unsupported operation")
