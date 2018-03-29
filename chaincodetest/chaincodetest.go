@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
@@ -18,7 +17,6 @@ type Record struct {
 	Disease    string
 	Link       string
 	Checkpoint bool
-	Timestamp  time.Time
 }
 
 type Token struct {
@@ -61,7 +59,6 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		if err != nil {
 			return nil, errors.New("Failed to change checkpoint from string to bool")
 		}
-		record.Timestamp = time.Now()
 		value, err = stub.GetState(patient_id)
 		if err != nil {
 			return nil, errors.New("Failed to get the patient's records")
